@@ -726,3 +726,4 @@ document.getElementById("showDeviations").addEventListener("click", () => {
 
 // --- Tegn loggen ved oppstart ---
 renderWeaponLog();
+ 
