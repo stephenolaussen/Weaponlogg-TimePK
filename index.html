@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#0f172a" />
   <link rel="icon" type="image/png" href="assets/icons/icon-192.png">
 </head>
-<link rel="manifest" href="manifest.json">
+
 <body>
   <header class="app-header">
     <img src="assets/icons/timepk-logo.png" alt="Time PK" class="logo" onerror="this.style.display='none'">
@@ -134,7 +134,10 @@
 
   <footer class="app-footer">
     Lokal lagring i nettleser (localStorage). Bruk Eksport/Import for sikkerhetskopi og migrering.
-  </footer>
+    <button id="installBtn" style="display:none;position:fixed;bottom:1rem;right:1rem;padding:0.6rem 1rem;background:#0f172a;color:#fff;border:none;border-radius:6px;z-index:1000;">
+  Installer appen
+</button>
+      </footer>
 
   <script defer src="app.js"></script>
   <script>
@@ -143,6 +146,26 @@
       navigator.serviceWorker.register("./sw.js").catch(console.error);
     });
   }
+  let deferredPrompt;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('installBtn').style.display = 'block';
+});
+
+document.getElementById('installBtn').addEventListener('click', () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then((choiceResult) => {
+      if (choiceResult.outcome === 'accepted') {
+        console.log('App installert!');
+      }
+      deferredPrompt = null;
+      document.getElementById('installBtn').style.display = 'none';
+    });
+  }
+});
 </script>
 </body>
 </html>
