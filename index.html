@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Time Pistolklubb – Lånevåpen</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="icon" type="image/png" href="assets/icons/icon-192.png">
+</head>
+<link rel="manifest" href="manifest.json">
+<body>
+  <header class="app-header">
+    <img src="assets/icons/timepk-logo.png" alt="Time PK" class="logo" onerror="this.style.display='none'">
+    <h1>Time Pistolklubb – Lånevåpen</h1>
+    <div class="stat">
+      <span id="statBadge" class="pill ok">Ingen utleide våpen</span>
+      <span id="antallAktive">0</span> aktive utlån
+      <span id="pussAlarmBadge" class="pill alert" style="display:none">
+        Puss-alarm: <span id="pussCount">0</span>
+      </span>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button id="tabUtlån" class="active" type="button">Utlån</button>
+    <button id="tabHistorikk" type="button">Historikk</button>
+  </nav>
+
+  <main id="viewUtlån" class="view grid">
+    <section class="panel">
+      <h2>Skyteleder</h2>
+      <div class="row">
+        <select id="skytelederSelect" title="Velg skyteleder"></select>
+        <button id="nySkytelederBtn" class="primary" type="button">Ny skyteleder</button>
+      </div>
+      <div class="hint">Aktiv skyteleder lagres på hvert utlån.</div>
+    </section>
+
+    <section class="panel">
+      <h2>Medlemmer</h2>
+      <div class="row">
+        <input id="medlemSok" placeholder="Søk medlem..." />
+        <button id="nyttMedlemBtn" class="primary" type="button">Nytt medlem</button>
+      </div>
+      <div id="medlemsListe" class="list"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Våpen</h2>
+      <div class="row">
+        <input id="vapenSok" placeholder="Søk våpen eller serienummer..." />
+        <button id="nyttVapenBtn" class="primary" type="button">Nytt våpen</button>
+      </div>
+      <div id="vapenListe" class="list"></div>
+      <div class="hint small">Våpen markert rødt har over 30 treninger siden siste puss.</div>
+    </section>
+
+    <section class="panel">
+      <h2>Aktive utlån</h2>
+      <div id="aktiveUtlaan" class="list"></div>
+      <div class="hint" style="margin-top:8px;">Når denne listen er tom: OK å låse våpenskap.</div>
+    </section>
+   <!-- Tellefunksjon -->
+<section id="weapon-count-section" style="max-width:500px;margin:2rem auto;">
+  <h2>Våpentelling</h2>
+
+  <form id="weaponForm" style="display:flex;flex-direction:column;gap:0.8rem;">
+    <label for="count">Antall våpen:</label>
+    <input type="number" id="count" name="count" min="0" required style="padding:0.5rem;border-radius:6px;border:1px solid #ccc;">
+
+    <label for="phase">Fase:</label>
+    <select id="phase" name="phase" required style="padding:0.5rem;border-radius:6px;border:1px solid #ccc;">
+      <option value="før">Før trening</option>
+      <option value="etter">Etter trening</option>
+    </select>
+
+    <label for="note">Kommentar (valgfritt):</label>
+    <textarea id="note" name="note" rows="2" style="padding:0.5rem;border-radius:6px;border:1px solid #ccc;"></textarea>
+
+    <button type="submit" style="background:#1E88E5;color:#fff;padding:0.6rem;border:none;border-radius:6px;font-weight:600;cursor:pointer;">
+      Lagre telling
+    </button>
+  </form>
+
+  <!-- Filterknapp (kun én blokk) -->
+  <div style="margin: 1rem 0;">
+    <button id="showAll" type="button" class="active">Vis alle</button>
+    <button id="showDeviations" type="button">
+      Vis kun avvik (<span id="deviationCount">0</span>)
+    </button>
+  </div>
+
+  <h3 style="margin-top:2rem;">Logg</h3>
+  <ul id="weaponLog" style="list-style:none;padding:0;"></ul>
+</section>
+
+    <section class="panel">
+      <h2>Admin</h2>
+      <div class="grid3">
+        <button id="eksportBtn" type="button">Eksporter data</button>
+        <button id="importBtn" type="button">Importer data</button>
+        <button id="lastNedLoggBtn" type="button">Last ned våpenlogg (CSV)</button>
+      </div>
+      <textarea id="dataJson" placeholder="Lim inn/les ut JSON-data her..." rows="6" style="margin-top:8px;"></textarea>
+      <div class="hint">Eksport/Import tar med medlemmer, våpen, skyteledere og utlånshistorikk.</div>
+    </section>
+  </main>
+
+  <main id="viewHistorikk" class="view" style="display:none">
+    <section class="panel">
+      <h2>Historikk</h2>
+
+      <div class="filters">
+        <div class="row">
+          <input id="historikkSok" placeholder="Søk (medlem, våpen, serienr, skyteleder)..." />
+          <label class="check">
+            <input id="inkluderAktive" type="checkbox" />
+            Vis aktive
+          </label>
+        </div>
+        <div class="row">
+          <select id="filterVapen"></select>
+          <select id="filterSkyteleder"></select>
+          <select id="filterMedlem"></select>
+        </div>
+      </div>
+
+      <div id="historikkListe" class="list"></div>
+      <div id="historikkStat" class="hint" style="margin-top:8px;"></div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    Lokal lagring i nettleser (localStorage). Bruk Eksport/Import for sikkerhetskopi og migrering.
+  </footer>
+
+  <script defer src="app.js"></script>
+  <script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js").catch(console.error);
+    });
+  }
+</script>
+</body>
+</html>
