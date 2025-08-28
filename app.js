@@ -1,3 +1,22 @@
+// Egendefinert Ja/Nei-dialog
+function customConfirm(msg) {
+  return new Promise(resolve => {
+    const dialog = document.getElementById('customConfirm');
+    const msgDiv = document.getElementById('customConfirmMsg');
+    const yesBtn = document.getElementById('customConfirmYes');
+    const noBtn = document.getElementById('customConfirmNo');
+    msgDiv.textContent = msg;
+    dialog.style.display = 'flex';
+    function cleanup(result) {
+      dialog.style.display = 'none';
+      yesBtn.onclick = null;
+      noBtn.onclick = null;
+      resolve(result);
+    }
+    yesBtn.onclick = () => cleanup(true);
+    noBtn.onclick = () => cleanup(false);
+  });
+}
 // ====== Konstanter og "database" (localStorage) ======
 const PUSS_THRESHOLD = 30; // alarmgrense: mer enn 30 treninger siden puss
 
@@ -115,8 +134,8 @@ function settAktivSkyteleder(idVal) {
 }
 
 // Medlemmer
-function leggTilMedlem(navn, fodselsdato, telefon) {
-  state.medlemmer.push({ id: id(), navn: navn.trim(), fodselsdato: (fodselsdato||'').trim(), telefon: (telefon||'').trim() });
+function leggTilMedlem(navn, fodselsdato, telefon, kommentar) {
+  state.medlemmer.push({ id: id(), navn: navn.trim(), fodselsdato: (fodselsdato||'').trim(), telefon: (telefon||'').trim(), kommentar: (kommentar||'').trim() });
   persist(); render();
 }
 function fjernMedlem(mid) {
@@ -132,11 +151,29 @@ function finnVapenMedSerienr(serienummer) {
   const sn = (serienummer || '').trim().toLowerCase();
   return state.vapen.find(v => v.serienummer.toLowerCase() === sn);
 }
-function leggTilVapen(navn, serienummer) {
-  if (!navn || !navn.trim()) { alert('Våpennavn er påkrevd.'); return; }
-  if (!serienummer || !serienummer.trim()) { alert('Serienummer er påkrevd.'); return; }
-  if (finnVapenMedSerienr(serienummer)) { alert('Et våpen med dette serienummeret finnes allerede.'); return; }
-  state.vapen.push({ id: id(), navn: navn.trim(), serienummer: serienummer.trim(), totalBruk: 0, brukSidenPuss: 0, aktiv: true });
+function leggTilVapenFull(data) {
+  // data: {type, mekanisme, kaliber, fabrikat, model, serienummer, kommentar}
+  if (!data.type || !data.type.trim()) { alert('Våpen art er påkrevd.'); return; }
+  if (!data.mekanisme || !data.mekanisme.trim()) { alert('Mekanisme er påkrevd.'); return; }
+  if (!data.kaliber || !data.kaliber.trim()) { alert('Kaliber er påkrevd.'); return; }
+  if (!data.fabrikat || !data.fabrikat.trim()) { alert('Fabrikat er påkrevd.'); return; }
+  if (!data.model || !data.model.trim()) { alert('Model er påkrevd.'); return; }
+  if (!data.serienummer || !data.serienummer.trim()) { alert('Serienummer er påkrevd.'); return; }
+  if (finnVapenMedSerienr(data.serienummer)) { alert('Et våpen med dette serienummeret finnes allerede.'); return; }
+  state.vapen.push({
+    id: id(),
+    navn: data.type.trim(),
+    type: data.type.trim(),
+    mekanisme: data.mekanisme.trim(),
+    kaliber: data.kaliber.trim(),
+    fabrikat: data.fabrikat.trim(),
+    model: data.model.trim(),
+    serienummer: data.serienummer.trim(),
+    kommentar: data.kommentar ? data.kommentar.trim() : '',
+    totalBruk: 0,
+    brukSidenPuss: 0,
+    aktiv: true
+  });
   persist(); render();
 }
 function fjernVapen(vid) {
@@ -145,6 +182,11 @@ function fjernVapen(vid) {
   const v = state.vapen.find(x => x.id === vid);
   const bekreft = confirm(`Slette våpenet "${v?.navn || ''}" (${v?.serienummer || ''}) permanent?\nOBS: Total-bruken slettes fra registeret. Historikk beholdes.`);
   if (!bekreft) return;
+  const pass = prompt('Skriv inn passord for å slette våpen:');
+  if (pass !== 'Husebø1316') {
+    alert('Feil passord. Våpenet ble ikke slettet.');
+    return;
+  }
   state.vapen = state.vapen.filter(v => v.id !== vid);
   persist(); render();
 }
@@ -161,14 +203,29 @@ function aktivtUtlaanForVapen(vid) {
   return state.utlaan.find(u => u.vapenId === vid && u.slutt === null) || null;
 }
 function utlaan(vapenId, medlemId) {
+  // Sjekk om medlemmet kun kan låne .22
+  const medlem = state.medlemmer.find(m => m.id === medlemId);
+  const vapen = state.vapen.find(v => v.id === vapenId);
+  if (medlem && medlem.kun22 && vapen && vapen.kaliber && vapen.kaliber.trim() !== '.22') {
+    alert('Dette medlemmet kan kun låne våpen med kaliber .22');
+    return;
+  }
+  // Krev telling før utlån
+  const log = JSON.parse(localStorage.getItem('weaponLog') || '[]');
+  const sisteTelling = log.length > 0 ? log[log.length-1] : null;
+  if (!sisteTelling || sisteTelling.phase !== 'før') {
+    alert('Du må utføre telling av våpen (FØR) før utlån kan gjøres!');
+    return;
+  }
   const s = aktivSkyteleder();
   if (!s) { alert('Velg skyteleder før utlån.'); return; }
   if (!medlemId) { alert('Velg medlem før utlån.'); return; }
   if (aktivtUtlaanForVapen(vapenId)) { alert('Våpenet er allerede utlånt.'); return; }
   state.utlaan.push({ id: id(), medlemId, vapenId, start: nowISO(), slutt: null, skytelederId: s.id });
+  state.ui.valgtMedlemId = null;
   persist(); render();
 }
-function leverInn(utlaanId) {
+function leverInn(utlaanId) { //Ny funksjon for innlevering kommentar og kan leies ut og kan ikke leies ut
   const u = state.utlaan.find(x => x.id === utlaanId);
   if (!u || u.slutt) return;
   u.slutt = nowISO();
@@ -176,6 +233,24 @@ function leverInn(utlaanId) {
   if (v) {
     v.totalBruk += 1;
     v.brukSidenPuss += 1;
+
+    // --- NYTT: Spør om feil ved innlevering ---
+    let kommentar = prompt("Kommentar om feil på våpenet? (La stå tomt hvis alt er ok)");
+    let status = "ok";
+    if (kommentar && kommentar.trim() !== "") {
+      // Bruk egendefinert Ja/Nei-dialog
+      customConfirm("Kan våpenet fortsatt lånes ut?").then(result => {
+        status = result ? "ok" : "feil";
+        v.feilKommentar = kommentar || "";
+        v.feilStatus = status;
+        v.feilTid = (status === "feil") ? nowISO() : null;
+        persist(); render();
+      });
+      return;
+    }
+    v.feilKommentar = kommentar || "";
+    v.feilStatus = status; // "ok" eller "feil"
+    v.feilTid = (status === "feil") ? nowISO() : null;
   }
   persist(); render();
 }
@@ -216,101 +291,233 @@ function renderSkyteledere() {
 }
 
 function renderMedlemmer() {
+  // Fjern eventuell eksisterende boks
+  let boxDiv = document.getElementById('medlem22Div');
+  if (boxDiv) boxDiv.remove();
+  // Vis avkrysningsboks for valgt medlem
+  const valgt = state.medlemmer.find(m => m.id === state.ui.valgtMedlemId);
+  if (valgt) {
+    boxDiv = document.createElement('div');
+    boxDiv.id = 'medlem22Div';
+    boxDiv.style.marginTop = '0.7rem';
+    const label = document.createElement('label');
+    label.style.fontSize = '0.95em';
+    label.style.display = 'flex';
+    label.style.alignItems = 'center';
+    const check = document.createElement('input');
+    check.type = 'checkbox';
+    check.checked = !!valgt.kun22;
+    check.style.marginRight = '0.5em';
+    check.onchange = (e) => {
+      valgt.kun22 = !!e.target.checked;
+      persist();
+    };
+    label.appendChild(check);
+    label.appendChild(document.createTextNode('Kan kun låne .22'));
+    boxDiv.appendChild(label);
+    el.medlemsListe.parentNode.appendChild(boxDiv);
+  }
   const q = (el.medlemSok.value || '').trim().toLowerCase();
   const list = el.medlemsListe;
   list.innerHTML = '';
-  const medlemmer = [...state.medlemmer].sort((a,b)=>a.navn.localeCompare(b.navn,'no'));
-  medlemmer
+  // Nedtrekksmeny for medlem
+  if (!el.medlemSelect) {
+    el.medlemSelect = document.createElement('select');
+    el.medlemSelect.id = 'medlemSelect';
+    el.medlemSelect.style.width = '100%';
+    el.medlemsListe.parentNode.insertBefore(el.medlemSelect, el.medlemsListe);
+  }
+  el.medlemSelect.innerHTML = '';
+  const opt0 = document.createElement('option');
+  opt0.value = '';
+  opt0.textContent = 'Velg medlem...';
+  el.medlemSelect.appendChild(opt0);
+  const filtrerte = [...state.medlemmer]
     .filter(m => !q || m.navn.toLowerCase().includes(q) || (m.telefon||'').toLowerCase().includes(q))
-    .forEach(m => {
+    .sort((a,b)=>a.navn.localeCompare(b.navn,'no'));
+  filtrerte.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.id;
+    opt.textContent = `${m.navn} (${m.fodselsdato || '-'})`;
+    if (state.ui.valgtMedlemId === m.id) opt.selected = true;
+    el.medlemSelect.appendChild(opt);
+  });
+  el.medlemSelect.onchange = (e) => {
+    state.ui.valgtMedlemId = e.target.value || null;
+    render();
+  };
+
+  // Vis søkeresultater som liste under søkefeltet
+  el.medlemsListe.innerHTML = '';
+  if (q && filtrerte.length > 0) {
+    filtrerte.forEach(m => {
       const div = document.createElement('div');
-      div.className = 'item' + (state.ui.valgtMedlemId === m.id ? ' selected' : '');
-      const meta = document.createElement('div');
-      meta.className = 'meta';
-      const t = document.createElement('div'); t.className = 'title'; t.textContent = m.navn;
-      const s = document.createElement('div'); s.className = 'muted'; s.textContent = `Født: ${m.fodselsdato || '-'} · Tlf: ${m.telefon || '-'}`;
-      meta.appendChild(t); meta.appendChild(s);
-
-      const btns = document.createElement('div');
-      btns.className = 'row'; btns.style.justifyContent = 'flex-end';
-
-      const velg = document.createElement('button');
-      velg.textContent = state.ui.valgtMedlemId === m.id ? 'Valgt' : 'Velg';
-      velg.className = 'success';
-      velg.onclick = () => { state.ui.valgtMedlemId = (state.ui.valgtMedlemId === m.id ? null : m.id); render(); };
-
-      const fjern = document.createElement('button');
-      fjern.textContent = 'Fjern';
-      fjern.className = 'danger';
-      fjern.onclick = () => { if (confirm(`Fjerne ${m.navn}?`)) fjernMedlem(m.id); };
-
-      btns.appendChild(velg); btns.appendChild(fjern);
-
-      div.appendChild(meta); div.appendChild(btns);
-      list.appendChild(div);
+      div.className = 'item';
+      div.style.cursor = 'pointer';
+      div.textContent = `${m.navn} (${m.fodselsdato || '-'})`;
+      div.onclick = () => {
+        state.ui.valgtMedlemId = m.id;
+        el.medlemSelect.value = m.id;
+        render();
+      };
+      el.medlemsListe.appendChild(div);
     });
+  }
 }
 
 function renderVapen() {
   const q = (el.vapenSok.value || '').trim().toLowerCase();
   const list = el.vapenListe;
   list.innerHTML = '';
+  // Nedtrekksmeny for våpenvalg (kun for utlån, ikke for admin)
+  if (!el.vapenSelect) {
+    el.vapenSelect = document.createElement('select');
+    el.vapenSelect.id = 'vapenSelect';
+    el.vapenSelect.style.width = '100%';
+    el.vapenListe.parentNode.insertBefore(el.vapenSelect, el.vapenListe);
+  }
+  el.vapenSelect.innerHTML = '';
+  const opt0 = document.createElement('option');
+  opt0.value = '';
+  opt0.textContent = 'Velg våpen...';
+  el.vapenSelect.appendChild(opt0);
+  [...state.vapen]
+    .filter(v => v.aktiv && (!q || v.navn?.toLowerCase().includes(q) || v.serienummer?.toLowerCase().includes(q)))
+    .sort((a,b)=>a.navn.localeCompare(b.navn,'no'))
+    .forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v.id;
+  let sn = v.serienummer || '';
+  let snLast4 = sn.slice(-4);
+  opt.textContent = `${v.fabrikat || ''} ${v.model || ''} ${v.kaliber || ''} S/N ${sn}${snLast4 ? ' (' + snLast4 + ')' : ''}`;
+      el.vapenSelect.appendChild(opt);
+    });
+  el.vapenSelect.onchange = (e) => {
+    // Kan utvides til å vise detaljer om valgt våpen
+  };
   const medlem = state.medlemmer.find(m => m.id === state.ui.valgtMedlemId) || null;
   const sld = aktivSkyteleder();
 
-  [...state.vapen]
-    .filter(v => v.aktiv && (!q || v.navn.toLowerCase().includes(q) || v.serienummer.toLowerCase().includes(q)))
-    .sort((a,b)=>a.navn.localeCompare(b.navn,'no'))
-    .forEach(v => {
+  // Tabelloppsett
+  const table = document.createElement('table');
+  table.className = 'weapon-table';
+  const thead = document.createElement('thead');
+  thead.innerHTML = `<tr>
+    <th>Våpen art</th>
+    <th>Mekanisme</th>
+    <th>Kaliber</th>
+    <th>Fabrikat</th>
+    <th>Model</th>
+    <th>Serienummer</th>
+    <th>Aktiv</th>
+    <th>Handling</th>
+  </tr>`;
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+
+  // Filtrer og sorter våpen
+  const filtered = [...state.vapen]
+    .filter(v => !q || (v.navn?.toLowerCase().includes(q) || v.serienummer?.toLowerCase().includes(q) || v.fabrikat?.toLowerCase().includes(q)))
+    .sort((a,b)=>a.navn.localeCompare(b.navn,'no'));
+
+  if (filtered.length === 0) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 9;
+    td.style.textAlign = 'center';
+    td.style.color = '#888';
+    td.textContent = 'Denne listen er tom: utfør telling av våpen';
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  } else {
+    filtered.forEach(v => {
       const utl = aktivtUtlaanForVapen(v.id);
       const needsPuss = v.brukSidenPuss > PUSS_THRESHOLD;
+      const tr = document.createElement('tr');
+      if (!v.aktiv) tr.style.background = '#fdd';
+      if (needsPuss) tr.style.background = '#ffe0e0';
 
-      const div = document.createElement('div'); 
-      div.className = 'item' + (needsPuss ? ' alarm' : '');
+      // Våpen art, mekanisme, kaliber, fabrikat, model
+      const tdArt = document.createElement('td'); tdArt.textContent = v.type || v.navn || '-';
+      const tdMek = document.createElement('td'); tdMek.textContent = v.mekanisme || '-';
+      const tdKal = document.createElement('td'); tdKal.textContent = v.kaliber || '-';
+      const tdFab = document.createElement('td'); tdFab.textContent = v.fabrikat || '-';
+      const tdMod = document.createElement('td'); tdMod.textContent = v.model || '-';
 
-      const meta = document.createElement('div'); meta.className = 'meta';
-      const title = document.createElement('div'); title.className = 'title'; title.textContent = `${v.navn} (${v.serienummer})`;
-      const sub = document.createElement('div'); sub.className = 'muted'; sub.textContent = `Total: ${v.totalBruk} · Siden puss: ${v.brukSidenPuss}`;
-      meta.appendChild(title); meta.appendChild(sub);
-
-      const right = document.createElement('div'); right.className = 'row'; right.style.justifyContent='flex-end';
-
-      const status = document.createElement('span');
-      status.className = 'badge ' + (utl ? 'danger-text' : '');
-      status.textContent = utl ? `Utlånt til ${navnForMedlem(utl.medlemId)}` : 'Tilgjengelig';
-
-      const alarmBadge = document.createElement('span');
-      if (needsPuss) {
-        alarmBadge.className = 'badge danger-text';
-        alarmBadge.textContent = 'Puss anbefalt';
-        right.appendChild(alarmBadge);
+      // Serienummer med utheving av 4 siste siffer
+      const tdSer = document.createElement('td');
+      if (v.serienummer) {
+        const sn = v.serienummer;
+        const snStart = sn.slice(0, -4);
+        const snEnd = sn.slice(-4);
+        tdSer.innerHTML = `${snStart}<b>${snEnd}</b>`;
+      } else {
+        tdSer.textContent = '-';
       }
 
+  // Kommentar-kolonne fjernet
+
+      // Aktiv
+      const tdAktiv = document.createElement('td');
+      tdAktiv.textContent = v.aktiv ? 'Ja' : 'Nei';
+      tdAktiv.style.color = v.aktiv ? 'green' : 'red';
+
+      // Handlinger
+      const tdHand = document.createElement('td');
+      tdHand.style.whiteSpace = 'nowrap';
+      // Lån-knapp
       const btn = document.createElement('button');
       btn.textContent = medlem ? `Lån til ${medlem.navn}` : 'Velg medlem';
       btn.className = 'primary';
-      btn.disabled = !medlem || !!utl || !sld;
+      btn.disabled = !medlem || !!utl || !sld || v.feilStatus === "feil" || !v.aktiv;
+      if (v.feilStatus === "feil") btn.title = 'Våpenet har feil og kan ikke lånes ut';
       if (!sld) btn.title = 'Velg skyteleder';
+      if (!v.aktiv) btn.title = 'Våpenet er tatt ut av drift';
       btn.onclick = () => utlaan(v.id, medlem.id);
-
+      tdHand.appendChild(btn);
+      // Reset puss
       const puss = document.createElement('button');
-      puss.textContent = 'Reset våpenpuss';
+      puss.textContent = 'Reset puss';
       puss.className = 'warning';
       puss.onclick = () => resetPuss(v.id);
-
+      tdHand.appendChild(puss);
+      // Slett
       const fjern = document.createElement('button');
-      fjern.textContent = 'Slett våpen';
+      fjern.textContent = 'Slett';
       fjern.className = 'danger';
       fjern.onclick = () => fjernVapen(v.id);
+      tdHand.appendChild(fjern);
+      // Feil/fikset
+      if (v.feilStatus === "feil") {
+        const feilDiv = document.createElement('div');
+        feilDiv.style.color = 'red';
+        feilDiv.textContent = `FEIL: ${v.feilKommentar || 'Ukjent feil'} (Kan ikke lånes ut)`;
+        tdHand.appendChild(feilDiv);
+        const fixBtn = document.createElement('button');
+        fixBtn.textContent = "Fikset – klar til utlån";
+        fixBtn.className = 'success';
+        fixBtn.onclick = () => {
+          v.feilStatus = "ok";
+          v.feilKommentar = "";
+          v.feilTid = null;
+          persist(); render();
+        };
+        tdHand.appendChild(fixBtn);
+      }
 
-      right.appendChild(status);
-      right.appendChild(btn);
-      right.appendChild(puss);
-      right.appendChild(fjern);
-
-      div.appendChild(meta); div.appendChild(right);
-      list.appendChild(div);
+  tr.appendChild(tdArt);
+  tr.appendChild(tdMek);
+  tr.appendChild(tdKal);
+  tr.appendChild(tdFab);
+  tr.appendChild(tdMod);
+  tr.appendChild(tdSer);
+  tr.appendChild(tdAktiv);
+  tr.appendChild(tdHand);
+      tbody.appendChild(tr);
     });
+  }
+  table.appendChild(tbody);
+  list.appendChild(table);
 }
 
 function renderAktive() {
@@ -433,8 +640,13 @@ function renderHistorikk() {
       const div = document.createElement('div'); div.className='item';
       const meta = document.createElement('div'); meta.className='meta';
 
+      // Våpeninfo med alle felter
       const t = document.createElement('div'); t.className='title';
-      t.textContent = `${v?.navn || 'Våpen'} (${v?.serienummer || '?'}) → ${m?.navn || 'Medlem'}`;
+      t.innerHTML =
+        `<b>${v?.type || v?.navn || ''}</b> &ndash; ${v?.mekanisme || ''} &ndash; ${v?.kaliber || ''} &ndash; ${v?.fabrikat || ''} &ndash; ${v?.model || ''} <br>
+        <span style='color:#888'>Serienr: ${v?.serienummer || ''}</span> <br>
+        <span style='color:#888'>Kommentar: ${v?.kommentar || ''}</span> <br>
+        <span style='color:#888'>→ ${m?.navn || 'Medlem'}${m ? ` (${m.fodselsdato || '-'}, ${m.telefon || '-'})` : ''}</span>`;
 
       const period = u.slutt ? `${fmtDateTime(u.start)} – ${fmtDateTime(u.slutt)}` : `${fmtDateTime(u.start)} (aktiv)`;
       const sub = document.createElement('div'); sub.className='muted';
@@ -476,10 +688,23 @@ function render() {
 
 // ====== Admin: Last ned våpenlogg (CSV) ======
 function lastNedVapenLogg() {
-  const header = ['Våpennavn','Serienummer','Totalt antall treninger'];
+  const header = ['Våpen art','Mekanisme','Kaliber','Fabrikat','Model','Serienummer','Kommentar','Totalt antall treninger','Siden puss','Feilstatus','Feilkommentar','Feil registrert'];
   const rows = state.vapen
     .sort((a,b)=>a.navn.localeCompare(b.navn,'no'))
-    .map(v => [v.navn, v.serienummer, String(v.totalBruk)]);
+    .map(v => [
+      v.type || v.navn || '',
+      v.mekanisme || '',
+      v.kaliber || '',
+      v.fabrikat || '',
+      v.model || '',
+      v.serienummer || '',
+      v.kommentar || '',
+      String(v.totalBruk),
+      String(v.brukSidenPuss),
+      v.feilStatus === "feil" ? "Kan ikke lånes ut" : "OK",
+      v.feilKommentar || "",
+      v.feilTid ? fmtDateTime(v.feilTid) : ""
+    ]);
   // Semikolon-separert CSV for norsk Excel
   const csv = [header, ...rows].map(r => r.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(';')).join('\n');
   const date = new Date().toISOString().slice(0,10);
@@ -512,19 +737,40 @@ el.skytelederSelect.addEventListener('change', e => settAktivSkyteleder(e.target
 el.nyttMedlemBtn.addEventListener('click', () => {
   const navn = prompt('Medlemsnavn:');
   if (!navn || !navn.trim()) return;
-  const fd = prompt('Fødselsdato (dd.mm.åååå):') || '';
+  let fd = prompt('Fødselsdato (ddmmåååå eller dd.mm.åååå):') || '';
+  fd = fd.replace(/\D/g, '');
+  if (fd.length === 8) {
+    fd = fd.replace(/(\d{2})(\d{2})(\d{4})/, '$1.$2.$3');
+  }
   const tlf = prompt('Telefon:') || '';
-  leggTilMedlem(navn, fd, tlf);
+  leggTilMedlem(navn, fd, tlf, '');
+  // Sjekk om medlemmet kun kan låne .22
+  const medlem = state.medlemmer.find(m => m.id === medlemId);
+  const vapen = state.vapen.find(v => v.id === vapenId);
+  if (medlem && medlem.kun22 && vapen && vapen.kaliber && vapen.kaliber.trim() !== '.22') {
+    alert('Dette medlemmet kan kun låne våpen med kaliber .22');
+    return;
+  }
 });
 el.medlemSok.addEventListener('input', renderMedlemmer);
 
 // Våpen
 el.nyttVapenBtn.addEventListener('click', () => {
-  const navn = prompt('Våpen (modell/beskrivelse):');
-  if (!navn || !navn.trim()) return;
-  const sn = prompt('Serienummer (påkrevd):');
-  if (!sn || !sn.trim()) { alert('Serienummer er påkrevd.'); return; }
-  leggTilVapen(navn, sn);
+  // Skjema for alle felter
+  const type = prompt('Våpen art (f.eks. Pistol, Revolver):');
+  if (!type || !type.trim()) return;
+  const mekanisme = prompt('Mekanisme (f.eks. Halvautomat, Repetér):');
+  if (!mekanisme || !mekanisme.trim()) return;
+  const kaliber = prompt('Kaliber (f.eks. 9mm, .22):');
+  if (!kaliber || !kaliber.trim()) return;
+  const fabrikat = prompt('Fabrikat (f.eks. Benelli, STI):');
+  if (!fabrikat || !fabrikat.trim()) return;
+  const model = prompt('Model (f.eks. PM 95E, Target master):');
+  if (!model || !model.trim()) return;
+  const serienummer = prompt('Serienummer (påkrevd):');
+  if (!serienummer || !serienummer.trim()) { alert('Serienummer er påkrevd.'); return; }
+  const kommentar = prompt('Kommentar (valgfritt):') || '';
+  leggTilVapenFull({type, mekanisme, kaliber, fabrikat, model, serienummer, kommentar});
 });
 el.vapenSok.addEventListener('input', renderVapen);
 
@@ -628,9 +874,12 @@ if ('serviceWorker' in navigator) {
     }
   });
 }
-//tellefunksjon lagt til
 // --- Teller og filter ---
-let currentFilter = "all";
+// 1. Vis kun avvik som standard
+let currentFilter = "deviations";
+
+// 2. Fase-styring
+let phaseLocked = false; // Låser fasevalg når det skal være låst
 
 function renderWeaponLog() {
   const logList = document.getElementById("weaponLog");
@@ -648,28 +897,41 @@ function renderWeaponLog() {
   });
 
   // Oppdater teller i knappen
-  const deviationCount = log.filter(entry => entry.deviation).length;
+  const deviationCount = log.filter(entry => entry.deviation && !entry.deviationApproved).length;
   document.getElementById("deviationCount").textContent = deviationCount;
 
   // Filtrer hvis nødvendig
   let filteredLog = log;
   if (currentFilter === "deviations") {
-    filteredLog = log.filter(entry => entry.deviation);
+    filteredLog = log.filter(entry => entry.deviation && !entry.deviationApproved);
   }
 
   // Tegn listen (nyeste først)
-  filteredLog.slice().reverse().forEach(entry => {
+  filteredLog.slice().reverse().forEach((entry, idx) => {
     const li = document.createElement('li');
     li.style.padding = '0.5rem';
     li.style.borderBottom = '1px solid #ddd';
 
-    if (entry.deviation) {
+    // Godkjent avvik vises hvitt i "Vis alle"
+    if (entry.deviation && entry.deviationApproved) {
+      li.style.color = '#fff';
+      li.style.background = '#4caf50';
+      li.innerHTML = `✔️ <strong>${entry.phase.toUpperCase()}</strong> – ${entry.count} våpen
+        <br><small>${new Date(entry.timestamp).toLocaleString('no-NO')}</small>
+        ${entry.note ? `<br><em>${entry.note}</em>` : ''}
+        <br><strong>AVVIK GODKJENT AV VÅPENANSVARLIG</strong>`;
+    }
+    // Ikke-godkjent avvik
+    else if (entry.deviation) {
       li.style.color = 'red';
       li.innerHTML = `⚠️ <strong>${entry.phase.toUpperCase()}</strong> – ${entry.count} våpen
         <br><small>${new Date(entry.timestamp).toLocaleString('no-NO')}</small>
         ${entry.note ? `<br><em>${entry.note}</em>` : ''}
-        <br><strong>AVVIK REGISTRERT</strong>`;
-    } else {
+        <br><strong>AVVIK REGISTRERT</strong>
+        <br><button class="approveBtn" data-idx="${log.length - 1 - idx}" style="margin-top:0.5rem;">Godkjenn avvik</button>`;
+    }
+    // Vanlig logg
+    else {
       li.innerHTML = `<strong>${entry.phase.toUpperCase()}</strong> – ${entry.count} våpen
         <br><small>${new Date(entry.timestamp).toLocaleString('no-NO')}</small>
         ${entry.note ? `<br><em>${entry.note}</em>` : ''}`;
@@ -677,14 +939,44 @@ function renderWeaponLog() {
 
     logList.appendChild(li);
   });
+
+  // Legg til godkjenn-knapp event
+  document.querySelectorAll('.approveBtn').forEach(btn => {
+    btn.onclick = function() {
+      const idx = parseInt(this.dataset.idx, 10);
+      const log = JSON.parse(localStorage.getItem('weaponLog') || '[]');
+      const entry = log[idx];
+      if (!entry) return;
+      const pass = prompt("Skriv inn passord for å godkjenne avvik:");
+      if (pass === "Husebø1316") {
+        entry.deviationApproved = true;
+        localStorage.setItem('weaponLog', JSON.stringify(log));
+        renderWeaponLog();
+        alert("Avvik godkjent av våpenansvarlig.");
+      } else {
+        alert("Feil passord.");
+      }
+    };
+  });
 }
 
 // --- Skjema for å lagre telling ---
+// 2. Fase starter alltid på "før"
+const phaseSelect = document.getElementById('phase');
+phaseSelect.value = "før";
+phaseSelect.disabled = true; // Låst til "før" ved oppstart
+
+function resetPhase() {
+  phaseSelect.value = "før";
+  phaseSelect.disabled = true;
+  phaseLocked = false;
+}
+
 document.getElementById('weaponForm').addEventListener('submit', function(e) {
   e.preventDefault();
 
   const count = parseInt(document.getElementById('count').value, 10);
-  const phase = document.getElementById('phase').value;
+  const phase = phaseSelect.value;
   const note = document.getElementById('note').value.trim();
   const timestamp = new Date().toISOString();
 
@@ -693,11 +985,18 @@ document.getElementById('weaponForm').addEventListener('submit', function(e) {
   const existingLog = JSON.parse(localStorage.getItem('weaponLog') || '[]');
 
   // Avviksvarsel i sanntid
+  let avvik = false;
   if (phase === "etter") {
     const lastBefore = [...existingLog].reverse().find(e => e.phase === "før");
     if (lastBefore && count !== lastBefore.count) {
-      alert(`⚠️ AVVIK OPPDAGET!\nFør trening: ${lastBefore.count} våpen\nEtter trening: ${count} våpen`);
+      avvik = true;
       logEntry.deviation = true;
+      // 3. Kommentar kreves ved avvik
+      if (!note) {
+        alert("Du må legge inn en kommentar for å lagre telling med avvik!");
+        return;
+      }
+      alert(`⚠️ AVVIK OPPDAGET!\nFør trening: ${lastBefore.count} våpen\nEtter trening: ${count} våpen`);
     }
   }
 
@@ -705,11 +1004,31 @@ document.getElementById('weaponForm').addEventListener('submit', function(e) {
   localStorage.setItem('weaponLog', JSON.stringify(existingLog));
 
   this.reset();
+
+  // 2. Etter lagring: hvis "før", bytt til "etter" og lås feltet
+  if (phase === "før") {
+    phaseSelect.value = "etter";
+    phaseSelect.disabled = true;
+    phaseLocked = true;
+  } else {
+    // Etter "etter", tilbake til "før" og lås
+    resetPhase();
+  }
+
   renderWeaponLog();
   alert(`Telling lagret: ${count} våpen (${phase})`);
 });
 
+// 2. Lås fasevalg, brukeren kan ikke endre selv
+phaseSelect.addEventListener('mousedown', function(e) {
+  if (phaseSelect.disabled) e.preventDefault();
+});
+phaseSelect.addEventListener('keydown', function(e) {
+  if (phaseSelect.disabled) e.preventDefault();
+});
+
 // --- Filterknapper ---
+// 1. "Vis kun avvik" aktiv som standard
 document.getElementById("showAll").addEventListener("click", () => {
   currentFilter = "all";
   document.getElementById("showAll").classList.add("active");
@@ -725,5 +1044,9 @@ document.getElementById("showDeviations").addEventListener("click", () => {
 });
 
 // --- Tegn loggen ved oppstart ---
+// 1. Sett "Vis kun avvik" aktiv
+document.getElementById("showDeviations").classList.add("active");
+document.getElementById("showAll").classList.remove("active");
+phaseSelect.value = "før";
+phaseSelect.disabled = true;
 renderWeaponLog();
- 
