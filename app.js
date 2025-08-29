@@ -795,13 +795,8 @@ el.nyttMedlemBtn.addEventListener('click', () => {
   }
   const tlf = prompt('Telefon:') || '';
   leggTilMedlem(navn, fd, tlf, '');
-  // Sjekk om medlemmet kun kan låne .22
-  const medlem = state.medlemmer.find(m => m.id === medlemId);
-  const vapen = state.vapen.find(v => v.id === vapenId);
-  if (medlem && medlem.kun22 && vapen && vapen.kaliber && vapen.kaliber.trim() !== '.22') {
-    alert('Dette medlemmet kan kun låne våpen med kaliber .22');
-    return;
-  }
+  // Opprydding: Sjekk for .22-lån skjer kun ved faktisk utlån, ikke ved opprettelse av medlem
+  // state.ui.valgtMedlemId og state.ui.valgtVapenId brukes i utlånsflyt
 });
 el.medlemSok.addEventListener('input', renderMedlemmer);
 
