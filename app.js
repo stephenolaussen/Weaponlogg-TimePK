@@ -462,8 +462,8 @@ function renderVapen() {
       const utl = aktivtUtlaanForVapen(v.id);
       const needsPuss = v.brukSidenPuss > PUSS_THRESHOLD;
       const tr = document.createElement('tr');
-      if (!v.aktiv) tr.style.background = '#fdd';
-      if (needsPuss) tr.style.background = '#ffe0e0';
+  if (!v.aktiv) tr.style.background = '#fdd';
+  if (needsPuss) tr.classList.add('puss-alarm-row');
 
       // Fabrikat, model, kaliber, serienummer
       const tdFab = document.createElement('td'); tdFab.textContent = v.fabrikat || '-';
@@ -570,8 +570,9 @@ function renderAktive() {
       div.className='item' + (needsPuss ? ' alarm' : '');
 
       const meta = document.createElement('div'); meta.className='meta';
-      const title = document.createElement('div'); title.className='title';
-      title.textContent = `${v?.navn || 'Våpen'} (${v?.serienummer || '?'}) → ${m?.navn || 'Medlem'}`;
+  const title = document.createElement('div'); title.className='title';
+  // Vis kun fabrikat (eller 'Våpen' hvis mangler)
+  title.textContent = `${v?.fabrikat || 'Våpen'} (${v?.serienummer || '?'}) → ${m?.navn || 'Medlem'}`;
       const sub = document.createElement('div'); sub.className='muted';
       sub.textContent = `Utlånt: ${fmtDateTime(u.start)} · Skyteleder: ${s?.navn || '-'}`;
       meta.appendChild(title); meta.appendChild(sub);
