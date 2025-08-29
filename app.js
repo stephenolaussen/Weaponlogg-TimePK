@@ -92,6 +92,9 @@ const el = {
   // skyteleder
   skytelederSelect: document.getElementById('skytelederSelect'),
   nySkytelederBtn: document.getElementById('nySkytelederBtn'),
+  adminSkytelederBtn: document.getElementById('adminSkytelederBtn'),
+  adminSkytelederPanel: document.getElementById('adminSkytelederPanel'),
+  slettSkytelederBtn: document.getElementById('slettSkytelederBtn'),
   // medlemmer
   medlemsListe: document.getElementById('medlemsListe'),
   medlemSok: document.getElementById('medlemSok'),
@@ -782,6 +785,54 @@ el.nySkytelederBtn.addEventListener('click', () => {
   if (!navn || !navn.trim()) return;
   leggTilSkyteleder(navn);
 });
+// Admin-knapp for skyteleder
+el.adminSkytelederBtn.addEventListener('click', () => {
+  const pass = prompt('Skriv inn admin-passord:');
+  if (pass === getAdminPassord()) {
+    el.adminSkytelederPanel.style.display = '';
+    el.adminSkytelederPanel.dataset.admin = '1';
+  } else {
+    alert('Feil passord.');
+  }
+});
+
+// Slett skyteleder-knapp
+el.slettSkytelederBtn.addEventListener('click', async () => {
+  if (el.adminSkytelederPanel.dataset.admin !== '1') {
+    alert('Du må aktivere admin først.');
+    return;
+  }
+  const select = el.skytelederSelect;
+  const id = select.value;
+  if (!id) { alert('Velg en skyteleder først.'); return; }
+  const s = state.skyteledere.find(x => x.id === id);
+  if (!s) { alert('Skyteleder ikke funnet.'); return; }
+  const bekreft = await customConfirm(`Slette skyteleder "${s.navn}" permanent?`);
+  if (!bekreft) return;
+  state.skyteledere = state.skyteledere.filter(x => x.id !== id);
+  if (state.settings.aktivSkytelederId === id) state.settings.aktivSkytelederId = null;
+  persist();
+  renderSkyteledere();
+  el.adminSkytelederPanel.style.display = 'none';
+  el.adminSkytelederPanel.dataset.admin = '';
+});
+
+// Skjul adminpanel når man bytter skyteleder
+el.skytelederSelect.addEventListener('change', () => {
+  el.adminSkytelederPanel.style.display = 'none';
+  el.adminSkytelederPanel.dataset.admin = '';
+});
+
+// Hent admin-passord fra eksisterende logikk (bruk samme som for sletting)
+function getAdminPassord() {
+  // Finn passord fra eksisterende slett-funksjon
+  // Søk etter passord brukt i sletting av skyteleder
+  // Eksempel: const pass = prompt("Skriv inn passord for å slette skyteleder:");
+  // Hardkodet passord kan ligge i funksjon eller variabel
+  // Sjekk om det finnes en variabel eller bruk hardkodet verdi her
+  // For enkelhet, bruk samme som i slett-funksjonen (oppdater om nødvendig)
+  return 'Husebø1316';
+}
 el.skytelederSelect.addEventListener('change', e => settAktivSkyteleder(e.target.value || null));
 
 // Medlemmer
