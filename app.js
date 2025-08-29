@@ -1104,3 +1104,4 @@ document.getElementById("showAll").classList.remove("active");
 phaseSelect.value = "før";
 phaseSelect.disabled = true;
 renderWeaponLog();
+//updated 29.08.2025
