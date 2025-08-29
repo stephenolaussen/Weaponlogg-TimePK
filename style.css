@@ -1,3 +1,14 @@
+/* Ekstra mellomrom mellom kolonner i våpentabellen */
+.weapon-table th, .weapon-table td {
+  padding-left: 18px;
+  padding-right: 18px;
+}
+.weapon-table th:first-child, .weapon-table td:first-child {
+  padding-left: 24px;
+}
+.weapon-table th:last-child, .weapon-table td:last-child {
+  padding-right: 24px;
+}
 :root{
   --bg:#0f172a;
   --panel:#111827;

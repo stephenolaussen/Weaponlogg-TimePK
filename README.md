@@ -1,4 +1,4 @@
-# TimePK 1.30 (V4.1)
+# TimePK 1.30 (V4.2)
 
 ## Overview
 Weaponlogg-TimePK is spesialy made for a shooting club called TimePK (Time Pistol Klubb). It is a web-based application designed to help Range Officer efficiently track and manage all of the things a Range Officer needs to manage at the firerange regarding the firearms.
@@ -9,11 +9,15 @@ Will then be lounched with other names and logos, English language, etc.
 This app features a modern user interface, offline support, and is optimized for both desktop and mobile devices.
 
 ## Features
-- Weapon tracking and management
-- Responsive design for desktop and mobile
-- Progressive Web App (PWA) support (installable, offline functionality)
-- User-friendly interface
-. Some features ar password locked and you will need to change password yourself.
+ - Weapon tracking and management
+ - Responsive design for desktop and mobile
+ - Progressive Web App (PWA) support (installable, offline functionality)
+ - User-friendly interface
+ - Some features are password locked and you will need to change password yourself.
+ - Approve deviations (avvik) with password and optional comment for traceability
+## Deviation Approval (Avvik)
+
+When approving a deviation (avvik), the responsible person must enter a password and can add a comment to the approval. The comment is stored and shown in the log for traceability.
 ## Getting Started
 
 1. **Clone the repository:**

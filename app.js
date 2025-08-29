@@ -132,7 +132,26 @@ function settAktivSkyteleder(idVal) {
   state.settings.aktivSkytelederId = idVal || null;
   persist(); render();
 }
-
+function fjernSkyteleder(sid) {
+  if (state.skyteledere.length <= 1) {
+    alert("Du må ha minst én skyteleder.");
+    return;
+  }
+  const s = state.skyteledere.find(x => x.id === sid);
+  if (!s) return;
+  const bekreft = confirm(`Slette skyteleder "${s.navn}" permanent?`);
+  if (!bekreft) return;
+  const pass = prompt("Skriv inn passord for å slette skyteleder:");
+  if (pass !== "Husebø1316") {
+    alert("Feil passord. Skyteleder ble ikke slettet.");
+    return;
+  }
+  state.skyteledere = state.skyteledere.filter(x => x.id !== sid);
+  if (state.settings.aktivSkytelederId === sid) {
+    state.settings.aktivSkytelederId = state.skyteledere[0]?.id || null;
+  }
+  persist(); render();
+}
 // Medlemmer
 function leggTilMedlem(navn, fodselsdato, telefon, kommentar) {
   state.medlemmer.push({ id: id(), navn: navn.trim(), fodselsdato: (fodselsdato||'').trim(), telefon: (telefon||'').trim(), kommentar: (kommentar||'').trim() });
@@ -182,9 +201,9 @@ function fjernVapen(vid) {
   const v = state.vapen.find(x => x.id === vid);
   const bekreft = confirm(`Slette våpenet "${v?.navn || ''}" (${v?.serienummer || ''}) permanent?\nOBS: Total-bruken slettes fra registeret. Historikk beholdes.`);
   if (!bekreft) return;
-  const pass = prompt('Skriv inn passord for å slette våpen:');
-  if (pass !== 'Husebø1316') {
-    alert('Feil passord. Våpenet ble ikke slettet.');
+  const pass = prompt("Skriv inn passord for å slette våpen:");
+  if (pass !== "Husebø1316") {
+    alert("Feil passord. Våpenet ble ikke slettet.");
     return;
   }
   state.vapen = state.vapen.filter(v => v.id !== vid);
@@ -222,7 +241,7 @@ function utlaan(vapenId, medlemId) {
   if (!medlemId) { alert('Velg medlem før utlån.'); return; }
   if (aktivtUtlaanForVapen(vapenId)) { alert('Våpenet er allerede utlånt.'); return; }
   state.utlaan.push({ id: id(), medlemId, vapenId, start: nowISO(), slutt: null, skytelederId: s.id });
-  state.ui.valgtMedlemId = null;
+  state.ui.valgtMedlemId = null;//Lagt til slik at medlemmet ikke er valgt etter utlån
   persist(); render();
 }
 function leverInn(utlaanId) { //Ny funksjon for innlevering kommentar og kan leies ut og kan ikke leies ut
@@ -237,20 +256,28 @@ function leverInn(utlaanId) { //Ny funksjon for innlevering kommentar og kan lei
     // --- NYTT: Spør om feil ved innlevering ---
     let kommentar = prompt("Kommentar om feil på våpenet? (La stå tomt hvis alt er ok)");
     let status = "ok";
+    let feilTid = null;
     if (kommentar && kommentar.trim() !== "") {
-      // Bruk egendefinert Ja/Nei-dialog
+      // Bruk customConfirm for Ja/Nei-dialog
       customConfirm("Kan våpenet fortsatt lånes ut?").then(result => {
-        status = result ? "ok" : "feil";
+        const status = result ? "ok" : "feil";
+        const feilTid = status === "feil" ? nowISO() : null;
         v.feilKommentar = kommentar || "";
         v.feilStatus = status;
-        v.feilTid = (status === "feil") ? nowISO() : null;
+        v.feilTid = feilTid;
+        u.feilKommentar = kommentar || "";
+        u.feilStatus = status;
+        u.feilTid = feilTid;
         persist(); render();
       });
       return;
     }
     v.feilKommentar = kommentar || "";
-    v.feilStatus = status; // "ok" eller "feil"
-    v.feilTid = (status === "feil") ? nowISO() : null;
+    v.feilStatus = status;
+    v.feilTid = feilTid;
+    u.feilKommentar = kommentar || "";
+    u.feilStatus = status;
+    u.feilTid = feilTid;
   }
   persist(); render();
 }
@@ -400,14 +427,12 @@ function renderVapen() {
 
   // Tabelloppsett
   const table = document.createElement('table');
-  table.className = 'weapon-table';
+  table.className = 'weapon-table'; // CSS for padding mellom kolonner
   const thead = document.createElement('thead');
   thead.innerHTML = `<tr>
-    <th>Våpen art</th>
-    <th>Mekanisme</th>
-    <th>Kaliber</th>
     <th>Fabrikat</th>
     <th>Model</th>
+    <th>Kaliber</th>
     <th>Serienummer</th>
     <th>Aktiv</th>
     <th>Handling</th>
@@ -437,13 +462,10 @@ function renderVapen() {
       if (!v.aktiv) tr.style.background = '#fdd';
       if (needsPuss) tr.style.background = '#ffe0e0';
 
-      // Våpen art, mekanisme, kaliber, fabrikat, model
-      const tdArt = document.createElement('td'); tdArt.textContent = v.type || v.navn || '-';
-      const tdMek = document.createElement('td'); tdMek.textContent = v.mekanisme || '-';
-      const tdKal = document.createElement('td'); tdKal.textContent = v.kaliber || '-';
+      // Fabrikat, model, kaliber, serienummer
       const tdFab = document.createElement('td'); tdFab.textContent = v.fabrikat || '-';
       const tdMod = document.createElement('td'); tdMod.textContent = v.model || '-';
-
+      const tdKal = document.createElement('td'); tdKal.textContent = v.kaliber || '-';
       // Serienummer med utheving av 4 siste siffer
       const tdSer = document.createElement('td');
       if (v.serienummer) {
@@ -505,11 +527,9 @@ function renderVapen() {
         tdHand.appendChild(fixBtn);
       }
 
-  tr.appendChild(tdArt);
-  tr.appendChild(tdMek);
-  tr.appendChild(tdKal);
   tr.appendChild(tdFab);
   tr.appendChild(tdMod);
+  tr.appendChild(tdKal);
   tr.appendChild(tdSer);
   tr.appendChild(tdAktiv);
   tr.appendChild(tdHand);
@@ -518,6 +538,8 @@ function renderVapen() {
   }
   table.appendChild(tbody);
   list.appendChild(table);
+
+  // CSS for weapon-table flyttet til style.css for ryddighet
 }
 
 function renderAktive() {
@@ -688,7 +710,34 @@ function render() {
 
 // ====== Admin: Last ned våpenlogg (CSV) ======
 function lastNedVapenLogg() {
-  const header = ['Våpen art','Mekanisme','Kaliber','Fabrikat','Model','Serienummer','Kommentar','Totalt antall treninger','Siden puss','Feilstatus','Feilkommentar','Feil registrert'];
+  // Utvidet CSV-header med alle relevante felter
+  const header = [
+    'Våpen art','Mekanisme','Kaliber','Fabrikat','Model','Serienummer','Kommentar',
+    'Totalt antall treninger','Siden puss','Aktiv',
+    'Feilstatus','Feilkommentar','Feil registrert','Antall feil'
+  ];
+  // Funksjon for å telle antall feil for hvert våpen
+  // Teller antall utlån hvor det ble registrert feil ved innlevering
+  function countFeilForVapen(vapenId) {
+    return state.utlaan.filter(u =>
+      u.vapenId === vapenId &&
+      u.slutt &&
+      u.feilStatus === 'feil' &&
+      u.feilKommentar && u.feilKommentar.trim() !== ''
+    ).length;
+  }
+  // Hent siste feilregistrering for våpenet (eller tom streng)
+  function sisteFeilForVapen(vapenId) {
+    const feilUtlaan = state.utlaan.filter(u =>
+      u.vapenId === vapenId &&
+      u.slutt &&
+      u.feilStatus === 'feil' &&
+      u.feilKommentar && u.feilKommentar.trim() !== ''
+    );
+    if (feilUtlaan.length === 0) return { kommentar: '', tid: '' };
+    const siste = feilUtlaan[feilUtlaan.length - 1];
+    return { kommentar: siste.feilKommentar, tid: siste.feilTid ? fmtDateTime(siste.feilTid) : '' };
+  }
   const rows = state.vapen
     .sort((a,b)=>a.navn.localeCompare(b.navn,'no'))
     .map(v => [
@@ -701,9 +750,11 @@ function lastNedVapenLogg() {
       v.kommentar || '',
       String(v.totalBruk),
       String(v.brukSidenPuss),
-      v.feilStatus === "feil" ? "Kan ikke lånes ut" : "OK",
-      v.feilKommentar || "",
-      v.feilTid ? fmtDateTime(v.feilTid) : ""
+      v.aktiv ? 'Ja' : 'Nei',
+  v.feilStatus === "feil" ? "Kan ikke lånes ut" : "OK",
+  sisteFeilForVapen(v.id).kommentar,
+  sisteFeilForVapen(v.id).tid,
+  countFeilForVapen(v.id)
     ]);
   // Semikolon-separert CSV for norsk Excel
   const csv = [header, ...rows].map(r => r.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(';')).join('\n');
@@ -919,7 +970,8 @@ function renderWeaponLog() {
       li.innerHTML = `✔️ <strong>${entry.phase.toUpperCase()}</strong> – ${entry.count} våpen
         <br><small>${new Date(entry.timestamp).toLocaleString('no-NO')}</small>
         ${entry.note ? `<br><em>${entry.note}</em>` : ''}
-        <br><strong>AVVIK GODKJENT AV VÅPENANSVARLIG</strong>`;
+        <br><strong>AVVIK GODKJENT AV VÅPENANSVARLIG</strong>
+        ${entry.deviationApprovalComment ? `<br><em>Kommentar: ${entry.deviationApprovalComment}</em>` : ''}`;
     }
     // Ikke-godkjent avvik
     else if (entry.deviation) {
@@ -949,7 +1001,9 @@ function renderWeaponLog() {
       if (!entry) return;
       const pass = prompt("Skriv inn passord for å godkjenne avvik:");
       if (pass === "Husebø1316") {
+        let kommentar = prompt("Kommentar til godkjenning av avvik (valgfritt):");
         entry.deviationApproved = true;
+        entry.deviationApprovalComment = kommentar || "";
         localStorage.setItem('weaponLog', JSON.stringify(log));
         renderWeaponLog();
         alert("Avvik godkjent av våpenansvarlig.");
