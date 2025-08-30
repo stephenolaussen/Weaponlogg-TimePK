@@ -58,7 +58,14 @@
         <input id="medlemSok" placeholder="Søk medlem..." />
         <button id="nyttMedlemBtn" class="primary" type="button">Nytt medlem</button>
       </div>
-      <div id="medlemsListe" class="list"></div>
+  <div id="medlemsListe" class="list"></div>
+      <div id="adminMedlemPanel" style="display:none;margin-top:1em;">
+        <button id="slettMedlemBtn" class="danger" type="button">Slett valgt medlem</button>
+        <span class="hint small">Velg et medlem og trykk Slett.</span>
+      </div>
+      <div style="margin-top:1.5em">
+        <button id="adminMedlemBtn" class="primary" type="button">Admin</button>
+      </div>
     </section>
 
     <section class="panel">
@@ -119,6 +126,9 @@
       </div>
       <textarea id="dataJson" placeholder="Lim inn/les ut JSON-data her..." rows="6" style="margin-top:8px;"></textarea>
       <div class="hint">Eksport/Import tar med medlemmer, våpen, skyteledere og utlånshistorikk.</div>
+      <div style="margin-top:1em;">
+  <button id="adminChangePassBtn" class="danger" type="button" style="background:#c62828;color:#fff;">Admin: Bytt passord</button>
+      </div>
     </section>
   </main>
 

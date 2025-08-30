@@ -1,3 +1,30 @@
+// Admin-passord håndtering (kun én kilde)
+const PASSORD_KEY = 'tpk_admin_passord';
+function getAdminPassord() {
+  return localStorage.getItem(PASSORD_KEY) || 'TimePK';
+}
+function setAdminPassord(nytt) {
+  localStorage.setItem(PASSORD_KEY, nytt);
+}
+
+// Bytt alle passord via admin-knapp i admin-panelet
+const adminChangePassBtn = document.getElementById('adminChangePassBtn');
+if (adminChangePassBtn) {
+  adminChangePassBtn.addEventListener('click', () => {
+    const gjeldende = prompt('Skriv inn gjeldende admin-passord:');
+    if (gjeldende !== getAdminPassord()) {
+      alert('Feil passord.');
+      return;
+    }
+    let nytt = prompt('Vennligst tast nytt passord:');
+    if (!nytt || !nytt.trim()) {
+      alert('Passordet kan ikke være tomt.');
+      return;
+    }
+    setAdminPassord(nytt.trim());
+    alert('Alle admin-passord er nå byttet!');
+  });
+}
 // Egendefinert Ja/Nei-dialog
 function customConfirm(msg) {
   return new Promise(resolve => {
@@ -99,6 +126,9 @@ const el = {
   medlemsListe: document.getElementById('medlemsListe'),
   medlemSok: document.getElementById('medlemSok'),
   nyttMedlemBtn: document.getElementById('nyttMedlemBtn'),
+  adminMedlemBtn: document.getElementById('adminMedlemBtn'),
+  adminMedlemPanel: document.getElementById('adminMedlemPanel'),
+  slettMedlemBtn: document.getElementById('slettMedlemBtn'),
   // våpen
   vapenListe: document.getElementById('vapenListe'),
   vapenSok: document.getElementById('vapenSok'),
@@ -121,6 +151,44 @@ const el = {
 };
 
 // ====== Business-logikk ======
+// Admin-knapp for medlem
+el.adminMedlemBtn?.addEventListener('click', () => {
+  const pass = prompt('Skriv inn admin-passord:');
+  if (pass === getAdminPassord()) {
+    el.adminMedlemPanel.style.display = '';
+    el.adminMedlemPanel.dataset.admin = '1';
+  } else {
+    alert('Feil passord.');
+  }
+});
+
+// Slett medlem-knapp
+el.slettMedlemBtn?.addEventListener('click', async () => {
+  if (el.adminMedlemPanel.dataset.admin !== '1') {
+    alert('Du må aktivere admin først.');
+    return;
+  }
+  const mid = state.ui.valgtMedlemId;
+  if (!mid) { alert('Velg et medlem først.'); return; }
+  const m = state.medlemmer.find(x => x.id === mid);
+  if (!m) { alert('Medlem ikke funnet.'); return; }
+  const harAktiv = state.utlaan.some(u => u.medlemId === mid && u.slutt === null);
+  if (harAktiv) { alert('Kan ikke fjerne medlem med aktivt utlån. Lever inn først.'); return; }
+  const bekreft = await customConfirm(`Slette medlem "${m.navn}" permanent?`);
+  if (!bekreft) return;
+  state.medlemmer = state.medlemmer.filter(x => x.id !== mid);
+  if (state.ui.valgtMedlemId === mid) state.ui.valgtMedlemId = null;
+  persist();
+  render();
+  el.adminMedlemPanel.style.display = 'none';
+  el.adminMedlemPanel.dataset.admin = '';
+});
+
+// Skjul adminpanel når man bytter medlem
+el.medlemsListe?.addEventListener('click', () => {
+  el.adminMedlemPanel.style.display = 'none';
+  el.adminMedlemPanel.dataset.admin = '';
+});
 // Skyteleder
 function leggTilSkyteleder(navn) {
   const s = { id: id(), navn: navn.trim() };
@@ -145,7 +213,7 @@ function fjernSkyteleder(sid) {
   const bekreft = confirm(`Slette skyteleder "${s.navn}" permanent?`);
   if (!bekreft) return;
   const pass = prompt("Skriv inn passord for å slette skyteleder:");
-  if (pass !== "Husebø1316") {
+  if (pass !== getAdminPassord()) {
     alert("Feil passord. Skyteleder ble ikke slettet.");
     return;
   }
@@ -205,7 +273,7 @@ function fjernVapen(vid) {
   const bekreft = confirm(`Slette våpenet "${v?.navn || ''}" (${v?.serienummer || ''}) permanent?\nOBS: Total-bruken slettes fra registeret. Historikk beholdes.`);
   if (!bekreft) return;
   const pass = prompt("Skriv inn passord for å slette våpen:");
-  if (pass !== "Husebø1316") {
+  if (pass !== getAdminPassord()) {
     alert("Feil passord. Våpenet ble ikke slettet.");
     return;
   }
@@ -826,13 +894,7 @@ el.skytelederSelect.addEventListener('change', () => {
 
 // Hent admin-passord fra eksisterende logikk (bruk samme som for sletting)
 function getAdminPassord() {
-  // Finn passord fra eksisterende slett-funksjon
-  // Søk etter passord brukt i sletting av skyteleder
-  // Eksempel: const pass = prompt("Skriv inn passord for å slette skyteleder:");
-  // Hardkodet passord kan ligge i funksjon eller variabel
-  // Sjekk om det finnes en variabel eller bruk hardkodet verdi her
-  // For enkelhet, bruk samme som i slett-funksjonen (oppdater om nødvendig)
-  return 'Husebø1316';
+  return localStorage.getItem(PASSORD_KEY) || 'TimePK';
 }
 el.skytelederSelect.addEventListener('change', e => settAktivSkyteleder(e.target.value || null));
 
@@ -1047,7 +1109,7 @@ function renderWeaponLog() {
       const entry = log[idx];
       if (!entry) return;
       const pass = prompt("Skriv inn passord for å godkjenne avvik:");
-      if (pass === "Husebø1316") {
+  if (pass === getAdminPassord()) {
         let kommentar = prompt("Kommentar til godkjenning av avvik (valgfritt):");
         entry.deviationApproved = true;
         entry.deviationApprovalComment = kommentar || "";
