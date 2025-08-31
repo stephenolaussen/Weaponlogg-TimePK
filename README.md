@@ -1,4 +1,4 @@
-# TimePK 1.30 (V4.6)
+# TimePK 1.30 (V4.8)
 
 ## Overview
 Weaponlogg-TimePK is spesialy made for a shooting club called TimePK (Time Pistol Klubb). It is a web-based application designed to help Range Officer efficiently track and manage all of the things a Range Officer needs to manage at the firerange regarding the firearms.
@@ -16,6 +16,8 @@ This app features a modern user interface, offline support, and is optimized for
  - User-friendly interface
  - Some features are password locked and you will need to change password yourself.
  - Approve deviations (avvik) with password and optional comment for traceability
+ - CSV logg for tracking faults and fix for weapon
+ - CSV logg for gun cleaning
 ## Deviation Approval (Avvik)
 
 When approving a deviation (avvik), the responsible person must enter a password and can add a comment to the approval. The comment is stored and shown in the log for traceability.
