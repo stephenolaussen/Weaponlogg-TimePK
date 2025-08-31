@@ -1,4 +1,4 @@
-const CACHE_NAME = "timepk-cache-v4.8";
+const CACHE_NAME = "timepk-cache-v4.9";
 
 const ASSETS = [
   "index.html", // bytt til "timepk.html" hvis det er den du bruker
