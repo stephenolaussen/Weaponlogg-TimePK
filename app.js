@@ -1143,18 +1143,23 @@ document.getElementById('weaponForm').addEventListener('submit', function(e) {
   const note = document.getElementById('note').value.trim();
   const timestamp = new Date().toISOString();
 
-  const logEntry = { count, phase, note, timestamp };
+  // Ikke tillat telling etter trening hvis det finnes aktive utlån
+  if (phase === "etter") {
+    const aktiveUtlån = state.utlaan.filter(u => u.slutt === null).length;
+    if (aktiveUtlån > 0) {
+      alert("Du kan ikke telle 'etter trening' før alle våpen er levert inn!");
+      return;
+    }
+  }
 
+  const logEntry = { count, phase, note, timestamp };
   const existingLog = JSON.parse(localStorage.getItem('weaponLog') || '[]');
 
   // Avviksvarsel i sanntid
-  let avvik = false;
   if (phase === "etter") {
     const lastBefore = [...existingLog].reverse().find(e => e.phase === "før");
     if (lastBefore && count !== lastBefore.count) {
-      avvik = true;
       logEntry.deviation = true;
-      // 3. Kommentar kreves ved avvik
       if (!note) {
         alert("Du må legge inn en kommentar for å lagre telling med avvik!");
         return;
@@ -1168,13 +1173,12 @@ document.getElementById('weaponForm').addEventListener('submit', function(e) {
 
   this.reset();
 
-  // 2. Etter lagring: hvis "før", bytt til "etter" og lås feltet
+  // Etter lagring: hvis "før", bytt til "etter" og lås feltet, ellers tilbakestill
   if (phase === "før") {
     phaseSelect.value = "etter";
     phaseSelect.disabled = true;
     phaseLocked = true;
   } else {
-    // Etter "etter", tilbake til "før" og lås
     resetPhase();
   }
 
