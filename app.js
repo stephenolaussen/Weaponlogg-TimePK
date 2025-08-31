@@ -1,3 +1,37 @@
+// ====== Admin: Last ned full feil/fiks-historikk (CSV) ======
+function lastNedFeilFiksLogg() {
+  // Header for hendelseslogg
+  const header = [
+    'Våpen-ID','Serienummer','Fabrikat','Model','Dato feil','Feil-kommentar','Dato fikset','Fikset-kommentar','Medlem','Skyteleder'
+  ];
+  // Finn alle utlån med feil eller fiks-kommentar
+  const rows = state.utlaan
+    .filter(u => (u.feilKommentar && u.feilKommentar.trim() !== '') || (u.fiksetKommentar && u.fiksetKommentar.trim() !== ''))
+    .map(u => {
+      const v = state.vapen.find(x => x.id === u.vapenId) || {};
+      const m = state.medlemmer.find(x => x.id === u.medlemId) || {};
+      const s = state.skyteledere.find(x => x.id === u.skytelederId) || {};
+      return [
+        u.vapenId || '',
+        v.serienummer || '',
+        v.fabrikat || '',
+        v.model || '',
+        u.feilTid ? fmtDateTime(u.feilTid) : '',
+        u.feilKommentar || '',
+        u.fiksetTid ? fmtDateTime(u.fiksetTid) : '',
+        u.fiksetKommentar || '',
+        m.navn || '',
+        s.navn || ''
+      ];
+    });
+  const csv = [header, ...rows].map(r => r.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(';')).join('\n');
+  const date = new Date().toISOString().slice(0,10);
+  download(`timepk-feilfikslogg-${date}.csv`, csv, 'text/csv;charset=utf-8');
+}
+// Legg til knapp for å laste ned feil/fiks-logg (for eksempel i admin-panelet)
+if (document.getElementById('lastNedFeilFiksLoggBtn')) {
+  document.getElementById('lastNedFeilFiksLoggBtn').onclick = lastNedFeilFiksLogg;
+}
 // Admin-passord håndtering (kun én kilde)
 const PASSORD_KEY = 'tpk_admin_passord';
 function getAdminPassord() {
@@ -558,16 +592,16 @@ function renderVapen() {
       // Handlinger
       const tdHand = document.createElement('td');
       tdHand.style.whiteSpace = 'nowrap';
-      // Lån-knapp
-      const btn = document.createElement('button');
-      btn.textContent = medlem ? `Lån til ${medlem.navn}` : 'Velg medlem';
-      btn.className = 'primary';
-      btn.disabled = !medlem || !!utl || !sld || v.feilStatus === "feil" || !v.aktiv;
-      if (v.feilStatus === "feil") btn.title = 'Våpenet har feil og kan ikke lånes ut';
-      if (!sld) btn.title = 'Velg skyteleder';
-      if (!v.aktiv) btn.title = 'Våpenet er tatt ut av drift';
-      btn.onclick = () => utlaan(v.id, medlem.id);
-      tdHand.appendChild(btn);
+  // Lån-knapp
+  const btn = document.createElement('button');
+  btn.textContent = medlem ? `Lån til ${medlem.navn}` : 'Velg medlem';
+  btn.className = 'primary';
+  btn.disabled = !medlem || !!utl || !sld || v.feilStatus === "feil" || !v.aktiv;
+  if (v.feilStatus === "feil") btn.title = 'Våpenet har feil og kan ikke lånes ut';
+  if (!sld) btn.title = 'Velg skyteleder';
+  if (!v.aktiv) btn.title = 'Våpenet er tatt ut av drift';
+  btn.onclick = () => utlaan(v.id, medlem.id);
+  tdHand.appendChild(btn);
       // Reset puss
       const puss = document.createElement('button');
       puss.textContent = 'Reset puss';
@@ -590,10 +624,19 @@ function renderVapen() {
         fixBtn.textContent = "Fikset – klar til utlån";
         fixBtn.className = 'success';
         fixBtn.onclick = () => {
+          // Spør etter kommentar om hva som er fikset
+          const fiksetKommentar = prompt("Hva er fikset?")?.trim() || "";
           v.feilStatus = "ok";
-          v.feilKommentar = "";
+          v.feilKommentar = fiksetKommentar;
           v.feilTid = null;
-          persist(); render();
+          // Oppdater siste utlån med feilstatus for dette våpenet
+          const sisteFeilUtlaan = [...state.utlaan].reverse().find(u => u.vapenId === v.id && u.feilStatus === "feil");
+          if (sisteFeilUtlaan) {
+            sisteFeilUtlaan.fiksetKommentar = fiksetKommentar;
+            sisteFeilUtlaan.fiksetTid = nowISO();
+          }
+          persist();
+          render();
         };
         tdHand.appendChild(fixBtn);
       }
@@ -786,7 +829,7 @@ function lastNedVapenLogg() {
   const header = [
     'Våpen art','Mekanisme','Kaliber','Fabrikat','Model','Serienummer','Kommentar',
     'Totalt antall treninger','Siden puss','Aktiv',
-    'Feilstatus','Feilkommentar','Feil registrert','Antall feil'
+    'Feilstatus','Antall feil' // Antall registrerte feil på våpenet
   ];
   // Funksjon for å telle antall feil for hvert våpen
   // Teller antall utlån hvor det ble registrert feil ved innlevering
@@ -811,7 +854,7 @@ function lastNedVapenLogg() {
     return { kommentar: siste.feilKommentar, tid: siste.feilTid ? fmtDateTime(siste.feilTid) : '' };
   }
   const rows = state.vapen
-    .sort((a,b)=>a.navn.localeCompare(b.navn,'no'))
+    .sort((a, b) => a.navn.localeCompare(b.navn, 'no'))
     .map(v => [
       v.type || v.navn || '',
       v.mekanisme || '',
@@ -823,10 +866,8 @@ function lastNedVapenLogg() {
       String(v.totalBruk),
       String(v.brukSidenPuss),
       v.aktiv ? 'Ja' : 'Nei',
-  v.feilStatus === "feil" ? "Kan ikke lånes ut" : "OK",
-  sisteFeilForVapen(v.id).kommentar,
-  sisteFeilForVapen(v.id).tid,
-  countFeilForVapen(v.id)
+      v.feilStatus === 'feil' ? 'Kan ikke lånes ut' : 'OK',
+      countFeilForVapen(v.id) // Antall feil
     ]);
   // Semikolon-separert CSV for norsk Excel
   const csv = [header, ...rows].map(r => r.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(';')).join('\n');
