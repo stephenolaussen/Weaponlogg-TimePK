@@ -983,6 +983,8 @@ el.eksportBtn.addEventListener('click', () => {
     utlaan: state.utlaan,
     skyteledere: state.skyteledere,
     settings: state.settings,
+    weaponLog: JSON.parse(localStorage.getItem('weaponLog') || '[]'),
+    feilFiksLogg: state.utlaan.filter(u => (u.feilKommentar && u.feilKommentar.trim() !== '') || (u.fiksetKommentar && u.fiksetKommentar.trim() !== '')),
     eksportTid: nowISO()
   };
   el.dataJson.value = JSON.stringify(payload, null, 2);
@@ -997,6 +999,10 @@ el.importBtn.addEventListener('click', () => {
     state.utlaan = Array.isArray(d.utlaan) ? d.utlaan : [];
     state.skyteledere = Array.isArray(d.skyteledere) ? d.skyteledere : [];
     state.settings = d.settings || { aktivSkytelederId: null };
+    if (Array.isArray(d.weaponLog)) {
+      localStorage.setItem('weaponLog', JSON.stringify(d.weaponLog));
+    }
+    // feilFiksLogg er kun for eksport, ikke import, da den genereres fra utlaan
     persist(); render();
     alert('Import fullført.');
   } catch {
