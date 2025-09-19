@@ -14,7 +14,7 @@ This app features a modern user interface, offline support, and is optimized for
  - Responsive design for desktop and mobile
  - Progressive Web App (PWA) support (installable, offline functionality)
  - User-friendly interface
- - Some features are password locked and you will need to change password yourself.
+ - Some features are password locked and you will need to change password yourself. (PW: TimePK)
  - Approve deviations (avvik) with password and optional comment for traceability
  - CSV logg for tracking faults and fix for weapon
  - CSV logg for gun cleaning
