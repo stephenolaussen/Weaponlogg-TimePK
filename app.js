@@ -167,6 +167,7 @@ const el = {
   vapenListe: document.getElementById('vapenListe'),
   vapenSok: document.getElementById('vapenSok'),
   nyttVapenBtn: document.getElementById('nyttVapenBtn'),
+  weaponCounter: document.getElementById('weaponCounter'),
   // aktive utlån
   aktiveUtlaan: document.getElementById('aktiveUtlaan'),
   // admin
@@ -322,6 +323,25 @@ function resetPuss(vid) {
   persist(); render();
 }
 
+function updateWeaponCounter() {
+  if (!el.weaponCounter) return;
+  const totalWeapons = state.vapen.length;
+  const activeWeapons = state.vapen.filter(v => v.aktiv).length;
+  
+  if (totalWeapons === activeWeapons) {
+    el.weaponCounter.textContent = `${totalWeapons} våpen`;
+  } else {
+    el.weaponCounter.textContent = `${activeWeapons}/${totalWeapons} våpen (aktive/totalt)`;
+  }
+  
+  // Update tooltip to show breakdown
+  if (totalWeapons !== activeWeapons) {
+    el.weaponCounter.title = `${activeWeapons} aktive av ${totalWeapons} totalt`;
+  } else {
+    el.weaponCounter.title = `${totalWeapons} våpen totalt`;
+  }
+}
+
 // Utlån
 function aktivtUtlaanForVapen(vid) {
   return state.utlaan.find(u => u.vapenId === vid && u.slutt === null) || null;
@@ -370,6 +390,7 @@ function leverInn(utlaanId) { //Ny funksjon for innlevering kommentar og kan lei
         v.feilKommentar = kommentar || "";
         v.feilStatus = status;
         v.feilTid = feilTid;
+        v.aktiv = result; // Sett aktiv til false hvis våpenet ikke kan lånes ut
         u.feilKommentar = kommentar || "";
         u.feilStatus = status;
         u.feilTid = feilTid;
@@ -564,7 +585,7 @@ function renderVapen() {
       const utl = aktivtUtlaanForVapen(v.id);
       const needsPuss = v.brukSidenPuss > PUSS_THRESHOLD;
       const tr = document.createElement('tr');
-  if (!v.aktiv) tr.style.background = '#fdd';
+  // Fjernet bakgrunnsfarge for inaktive våpen - bruker kun tekstfarge i Aktiv-kolonnen
   if (needsPuss) tr.classList.add('puss-alarm-row');
 
       // Fabrikat, model, kaliber, serienummer
@@ -629,6 +650,7 @@ function renderVapen() {
           v.feilStatus = "ok";
           v.feilKommentar = fiksetKommentar;
           v.feilTid = null;
+          v.aktiv = true; // Sett våpenet tilbake til aktiv når det er fikset
           // Oppdater siste utlån med feilstatus for dette våpenet
           const sisteFeilUtlaan = [...state.utlaan].reverse().find(u => u.vapenId === v.id && u.feilStatus === "feil");
           if (sisteFeilUtlaan) {
@@ -818,6 +840,7 @@ function render() {
   renderSkyteledere();
   renderMedlemmer();
   renderVapen();
+  updateWeaponCounter();
   renderAktive();
   renderHistorikkFilters();
   renderHistorikk();
