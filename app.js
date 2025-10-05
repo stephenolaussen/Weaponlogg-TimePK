@@ -350,9 +350,13 @@ function utlaan(vapenId, medlemId) {
   // Sjekk om medlemmet kun kan låne .22
   const medlem = state.medlemmer.find(m => m.id === medlemId);
   const vapen = state.vapen.find(v => v.id === vapenId);
-  if (medlem && medlem.kun22 && vapen && vapen.kaliber && vapen.kaliber.trim() !== '.22') {
-    alert('Dette medlemmet kan kun låne våpen med kaliber .22');
-    return;
+  if (medlem && medlem.kun22 && vapen && vapen.kaliber) {
+    const kaliber = vapen.kaliber.trim();
+    // Tillat .22 og .177 (luftpistol) for medlemmer med "kun .22"
+    if (kaliber !== '.22' && kaliber !== '.177') {
+      alert('Dette medlemmet kan kun låne våpen med kaliber .22 eller .177');
+      return;
+    }
   }
   // Krev telling før utlån
   const log = JSON.parse(localStorage.getItem('weaponLog') || '[]');
@@ -1243,13 +1247,16 @@ document.getElementById('weaponForm').addEventListener('submit', function(e) {
 
   this.reset();
 
-  // Etter lagring: hvis "før", bytt til "etter" og lås feltet, ellers tilbakestill
+  // Etter lagring: hvis "før", bytt til "etter" og lås feltet
   if (phase === "før") {
     phaseSelect.value = "etter";
     phaseSelect.disabled = true;
     phaseLocked = true;
   } else {
-    resetPhase();
+    // Behold "etter" fase - ikke reset automatisk
+    phaseSelect.value = "etter";
+    phaseSelect.disabled = true;
+    phaseLocked = true;
   }
 
   renderWeaponLog();
