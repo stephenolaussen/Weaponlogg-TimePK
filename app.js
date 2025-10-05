@@ -1163,7 +1163,7 @@ function renderWeaponLog() {
         <br><small>${new Date(entry.timestamp).toLocaleString('no-NO')}</small>
         ${entry.note ? `<br><em>${entry.note}</em>` : ''}
         <br><strong>AVVIK REGISTRERT</strong>
-        <br><button class="approveBtn" data-idx="${log.length - 1 - idx}" style="margin-top:0.5rem;">Godkjenn avvik</button>`;
+        <br><button class="approveBtn" data-timestamp="${entry.timestamp}" style="margin-top:0.5rem;">Godkjenn avvik</button>`;
     }
     // Vanlig logg
     else {
@@ -1178,9 +1178,10 @@ function renderWeaponLog() {
   // Legg til godkjenn-knapp event
   document.querySelectorAll('.approveBtn').forEach(btn => {
     btn.onclick = function() {
-      const idx = parseInt(this.dataset.idx, 10);
+      const timestamp = this.dataset.timestamp;
       const log = JSON.parse(localStorage.getItem('weaponLog') || '[]');
-      const entry = log[idx];
+      const entryIndex = log.findIndex(entry => entry.timestamp === timestamp);
+      const entry = log[entryIndex];
       if (!entry) return;
       const pass = prompt("Skriv inn passord for å godkjenne avvik:");
   if (pass === getAdminPassord()) {
@@ -1247,16 +1248,13 @@ document.getElementById('weaponForm').addEventListener('submit', function(e) {
 
   this.reset();
 
-  // Etter lagring: hvis "før", bytt til "etter" og lås feltet
+  // Etter lagring: hvis "før", bytt til "etter" og lås feltet, ellers tilbakestill
   if (phase === "før") {
     phaseSelect.value = "etter";
     phaseSelect.disabled = true;
     phaseLocked = true;
   } else {
-    // Behold "etter" fase - ikke reset automatisk
-    phaseSelect.value = "etter";
-    phaseSelect.disabled = true;
-    phaseLocked = true;
+    resetPhase();
   }
 
   renderWeaponLog();
@@ -1291,7 +1289,26 @@ document.getElementById("showDeviations").addEventListener("click", () => {
 // 1. Sett "Vis kun avvik" aktiv
 document.getElementById("showDeviations").classList.add("active");
 document.getElementById("showAll").classList.remove("active");
-phaseSelect.value = "før";
-phaseSelect.disabled = true;
+
+// Sjekk siste telling og sett riktig fase
+function initializePhaseFromLog() {
+  const log = JSON.parse(localStorage.getItem('weaponLog') || '[]');
+  const sisteTelling = log.length > 0 ? log[log.length-1] : null;
+  
+  if (!sisteTelling) {
+    // Ingen telling enda - start med "før"
+    resetPhase();
+  } else if (sisteTelling.phase === "før") {
+    // Siste telling var "før" - nå skal det være "etter" (kan låne ut)
+    phaseSelect.value = "etter";
+    phaseSelect.disabled = true;
+    phaseLocked = true;
+  } else {
+    // Siste telling var "etter" - tilbake til "før" for ny periode
+    resetPhase();
+  }
+}
+
+initializePhaseFromLog();
 renderWeaponLog();
 //updated 19.09.2025
