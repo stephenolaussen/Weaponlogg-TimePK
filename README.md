@@ -19,7 +19,7 @@ This app features a modern user interface, offline support, and is optimized for
  - CSV logg for tracking faults and fix for weapon
  - CSV logg for gun cleaning
  - Added weapon counter and aktiv status: yes (green) and no (red)
- - Added Stamp count with deviation
+ - Added stamp deviation alert
 ## Deviation Approval (Avvik)
 
 When approving a deviation (avvik), the responsible person must enter a password and can add a comment to the approval. The comment is stored and shown in the log for traceability.

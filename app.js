@@ -350,9 +350,13 @@ function utlaan(vapenId, medlemId) {
   // Sjekk om medlemmet kun kan låne .22
   const medlem = state.medlemmer.find(m => m.id === medlemId);
   const vapen = state.vapen.find(v => v.id === vapenId);
-  if (medlem && medlem.kun22 && vapen && vapen.kaliber && vapen.kaliber.trim() !== '.22') {
-    alert('Dette medlemmet kan kun låne våpen med kaliber .22');
-    return;
+  if (medlem && medlem.kun22 && vapen && vapen.kaliber) {
+    const kaliber = vapen.kaliber.trim();
+    // Tillat .22 og .177 (luftpistol) for medlemmer med "kun .22"
+    if (kaliber !== '.22' && kaliber !== '.177') {
+      alert('Dette medlemmet kan kun låne våpen med kaliber .22 eller .177');
+      return;
+    }
   }
   // Krev telling før utlån
   const log = JSON.parse(localStorage.getItem('weaponLog') || '[]');
@@ -1159,7 +1163,7 @@ function renderWeaponLog() {
         <br><small>${new Date(entry.timestamp).toLocaleString('no-NO')}</small>
         ${entry.note ? `<br><em>${entry.note}</em>` : ''}
         <br><strong>AVVIK REGISTRERT</strong>
-        <br><button class="approveBtn" data-idx="${log.length - 1 - idx}" style="margin-top:0.5rem;">Godkjenn avvik</button>`;
+        <br><button class="approveBtn" data-timestamp="${entry.timestamp}" style="margin-top:0.5rem;">Godkjenn avvik</button>`;
     }
     // Vanlig logg
     else {
@@ -1174,9 +1178,10 @@ function renderWeaponLog() {
   // Legg til godkjenn-knapp event
   document.querySelectorAll('.approveBtn').forEach(btn => {
     btn.onclick = function() {
-      const idx = parseInt(this.dataset.idx, 10);
+      const timestamp = this.dataset.timestamp;
       const log = JSON.parse(localStorage.getItem('weaponLog') || '[]');
-      const entry = log[idx];
+      const entryIndex = log.findIndex(entry => entry.timestamp === timestamp);
+      const entry = log[entryIndex];
       if (!entry) return;
       const pass = prompt("Skriv inn passord for å godkjenne avvik:");
   if (pass === getAdminPassord()) {
@@ -1253,7 +1258,28 @@ document.getElementById('weaponForm').addEventListener('submit', function(e) {
   }
 
   renderWeaponLog();
-  alert(`Telling lagret: ${count} våpen (${phase})`);
+  
+  // Spør om stempel i stedet for simpelt varsel
+  customConfirm(`Telling lagret: ${count} våpen (${phase})\n\nEr stempelet i våpenskapet?`).then(result => {
+    if (!result) {
+      // Nei - registrer avvik for manglende stempel
+      const stempelAvvik = {
+        count: count,
+        phase: phase,
+        note: "Stempel mangler - Kontakt Våpenansvarlig",
+        timestamp: new Date().toISOString(),
+        deviation: true,
+        deviationApproved: false
+      };
+      
+      const log = JSON.parse(localStorage.getItem('weaponLog') || '[]');
+      log.push(stempelAvvik);
+      localStorage.setItem('weaponLog', JSON.stringify(log));
+      renderWeaponLog();
+      
+      alert("AVVIK REGISTRERT: Stempel mangler - Kontakt Våpenansvarlig");
+    }
+  });
 });
 
 // 2. Lås fasevalg, brukeren kan ikke endre selv
@@ -1284,7 +1310,26 @@ document.getElementById("showDeviations").addEventListener("click", () => {
 // 1. Sett "Vis kun avvik" aktiv
 document.getElementById("showDeviations").classList.add("active");
 document.getElementById("showAll").classList.remove("active");
-phaseSelect.value = "før";
-phaseSelect.disabled = true;
+
+// Sjekk siste telling og sett riktig fase
+function initializePhaseFromLog() {
+  const log = JSON.parse(localStorage.getItem('weaponLog') || '[]');
+  const sisteTelling = log.length > 0 ? log[log.length-1] : null;
+  
+  if (!sisteTelling) {
+    // Ingen telling enda - start med "før"
+    resetPhase();
+  } else if (sisteTelling.phase === "før") {
+    // Siste telling var "før" - nå skal det være "etter" (kan låne ut)
+    phaseSelect.value = "etter";
+    phaseSelect.disabled = true;
+    phaseLocked = true;
+  } else {
+    // Siste telling var "etter" - tilbake til "før" for ny periode
+    resetPhase();
+  }
+}
+
+initializePhaseFromLog();
 renderWeaponLog();
-//updated 19.09.2025
+//updated 05.10.2025
