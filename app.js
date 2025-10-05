@@ -1122,11 +1122,14 @@ function renderWeaponLog() {
   // Hent logg fra localStorage
   const log = JSON.parse(localStorage.getItem('weaponLog') || '[]');
 
-  // Beregn avvik for alle "etter"-poster
+  // Beregn avvik for alle "etter"-poster (men ikke overskrev manuelt satte avvik)
   log.forEach((entry, index) => {
     if (entry.phase === "etter") {
       const lastBefore = [...log.slice(0, index)].reverse().find(e => e.phase === "før");
-      entry.deviation = lastBefore && entry.count !== lastBefore.count;
+      // Ikke overskrev manuelt satte avvik (som stempelavvik)
+      if (entry.deviation === undefined) {
+        entry.deviation = lastBefore && entry.count !== lastBefore.count;
+      }
     }
   });
 
