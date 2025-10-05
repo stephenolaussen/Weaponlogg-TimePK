@@ -1332,4 +1332,4 @@ function initializePhaseFromLog() {
 
 initializePhaseFromLog();
 renderWeaponLog();
-//updated 19.09.2025
+//updated 05.10.2025
