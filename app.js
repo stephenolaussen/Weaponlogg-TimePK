@@ -1258,7 +1258,28 @@ document.getElementById('weaponForm').addEventListener('submit', function(e) {
   }
 
   renderWeaponLog();
-  alert(`Telling lagret: ${count} våpen (${phase})`);
+  
+  // Spør om stempel i stedet for simpelt varsel
+  customConfirm(`Telling lagret: ${count} våpen (${phase})\n\nEr stempelet i våpenskapet?`).then(result => {
+    if (!result) {
+      // Nei - registrer avvik for manglende stempel
+      const stempelAvvik = {
+        count: count,
+        phase: phase,
+        note: "Stempel mangler - Kontakt Våpenansvarlig",
+        timestamp: new Date().toISOString(),
+        deviation: true,
+        deviationApproved: false
+      };
+      
+      const log = JSON.parse(localStorage.getItem('weaponLog') || '[]');
+      log.push(stempelAvvik);
+      localStorage.setItem('weaponLog', JSON.stringify(log));
+      renderWeaponLog();
+      
+      alert("AVVIK REGISTRERT: Stempel mangler - Kontakt Våpenansvarlig");
+    }
+  });
 });
 
 // 2. Lås fasevalg, brukeren kan ikke endre selv
